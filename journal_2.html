@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Expense Tracker</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .chart-bar {
+      transition: height 0.5s ease-out;
+    }
+    @keyframes float {
+      0% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-10px) rotate(5deg); }
+      100% { transform: translateY(0) rotate(0deg); }
+    }
+    .animate-float {
+      animation: float 3s ease-in-out infinite;
+    }
+    .expense-item:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+    button:hover,
+    input:hover,
+    select:hover,
+    .expense-item:hover,
+    .chart-bar:hover {
+        box-shadow: 0 0 8px 2px #ed50e8, 0 0 24px 6px #00ffe7;
+        text-shadow: 0 0 8px #00ffe7, 0 0 16px #00ffe7;
+        border-color: #00ffe7 !important;
+        color: #ef1cc5 !important;
+        transition: box-shadow 0.2s, text-shadow 0.2s, color 0.2s, border-color 0.2s;
+  }
+  </style>
+</head>
+<body class="relative overflow-x-hidden">
+  <div class="absolute top-0 left-0 w-full h-full z-0 opacity-10">
+    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/cefd463c-93df-4790-81f3-65069d7382f3.png" class="absolute top-20 right-10 animate-float" style="animation-delay: 0.5s"/>
+    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/eab97249-9bcf-43f8-a94b-f67f630eee95.png" class="absolute bottom-40 left-20 animate-float" style="animation-delay: 1s"/>
+    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/4ffce747-77e9-4286-81ed-c6a552c25521.png" class="absolute top-1/3 left-1/4 animate-float" style="animation-delay: 1.5s"/>
+  </div>
+  <div id="root" class="min-h-screen bg-gradient-to-br from-gray-50 to-indigo-50 relative z-10"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const categories = [
+      { id: 'food', name: 'Food', color: 'bg-blue-500' },
+      { id: 'transport', name: 'Transport', color: 'bg-green-500' },
+      { id: 'housing', name: 'Housing', color: 'bg-yellow-500' },
+      { id: 'entertainment', name: 'Entertainment', color: 'bg-purple-500' },
+      { id: 'health', name: 'Health', color: 'bg-red-500' },
+      { id: 'late night food', name: 'late night food', color: 'bg-gray-500' },
+      { id: 'other', name: 'Other', color: 'bg-gray-500' }
+    ];
+
+    const ExpenseTracker = () => {
+      const [expenses, setExpenses] = useState([]);
+      const [title, setTitle] = useState('');
+      const [amount, setAmount] = useState('');
+      const [category, setCategory] = useState(categories[0].id);
+      const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+      const [editingId, setEditingId] = useState(null);
+      const [filter, setFilter] = useState('all');
+      const [chartData, setChartData] = useState([]);
+
+      // Load expenses from localStorage on initial render
+      useEffect(() => {
+        const savedExpenses = localStorage.getItem('expenses');
+        if (savedExpenses) {
+          setExpenses(JSON.parse(savedExpenses));
+        }
+      }, []);
+
+      // Save expenses to localStorage whenever they change
+      useEffect(() => {
+        localStorage.setItem('expenses', JSON.stringify(expenses));
+        updateChartData();
+      }, [expenses]);
+
+      const updateChartData = () => {
+        const data = categories.map(cat => {
+          const total = expenses.reduce((sum, expense) => {
+            return expense.category === cat.id ? sum + parseFloat(expense.amount) : sum;
+          }, 0);
+          return { ...cat, total };
+        });
+        setChartData(data);
+      };
+
+      const handleSubmit = (e) => {
+        e.preventDefault();
+        if (!title || !amount) return;
+
+        if (editingId) {
+          // Update existing expense
+          setExpenses(expenses.map(expense => 
+            expense.id === editingId 
+              ? { ...expense, title, amount, category, date } 
+              : expense
+          ));
+          setEditingId(null);
+        } else {
+          // Add new expense
+          const newExpense = {
+            id: Date.now().toString(),
+            title,
+            amount,
+            category,
+            date
+          };
+          setExpenses([...expenses, newExpense]);
+        }
+
+        // Reset form
+        setTitle('');
+        setAmount('');
+        setCategory(categories[0].id);
+        setDate(new Date().toISOString().slice(0, 10));
+      };
+
+      const handleDelete = (id) => {
+        setExpenses(expenses.filter(expense => expense.id !== id));
+      };
+
+      const handleEdit = (expense) => {
+        setTitle(expense.title);
+        setAmount(expense.amount);
+        setCategory(expense.category);
+        setDate(expense.date);
+        setEditingId(expense.id);
+      };
+
+      const filteredExpenses = filter === 'all' 
+        ? expenses 
+        : expenses.filter(expense => expense.category === filter);
+
+      const totalExpenses = filteredExpenses.reduce(
+        (sum, expense) => sum + parseFloat(expense.amount), 0
+      );
+
+      return (
+        <div className="container mx-auto px-4 py-8 max-w-4xl">
+          <div className="flex flex-col items-center mb-8">
+            <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/8306599f-5268-40e9-b2fa-ac0a3cb32e1f.png" alt="Money wallet illustration" className="mb-2"/>
+            <h1 className="text-4xl font-bold text-center text-transparent bg-clip-text bg-gradient-to-r from-indigo-600 to-purple-600">
+              Expense Tracker
+            </h1>
+            <p className="text-gray-500 mt-2">Track your finances with style</p>
+          </div>
+          
+          <div className="bg-white rounded-2xl shadow-xl p-6 mb-8 border-2 border-indigo-100 relative overflow-hidden">
+            <div className="absolute -right-10 -top-10 w-40 h-40 bg-indigo-100 rounded-full opacity-20"></div>
+            <div className="absolute -left-10 -bottom-10 w-32 h-32 bg-purple-100 rounded-full opacity-20"></div>
+            <h2 className="text-xl font-semibold mb-4">Add Expense</h2>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Title
+                  </label>
+                  <input
+                    type="text"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="e.g. Groceries"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Amount (Rupees)
+                  </label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    placeholder="0.00"
+                    min="0"
+                    step="0.01"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Category
+                  </label>
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    value={date}
+                    onChange={(e) => setDate(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    required
+                  />
+                </div>
+              </div>
+              <button
+                type="submit"
+                className="w-full md:w-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors"
+              >
+                {editingId ? 'Update Expense' : 'Add Expense'}
+              </button>
+            </form>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className="bg-white rounded-lg shadow-md p-6 md:col-span-2">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">Expenses</h2>
+                <div>
+                  <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  >
+                    <option value="all">All Categories</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                {filteredExpenses.length === 0 ? (
+                  <p className="text-gray-500 text-center py-4">
+                    No expenses found. Add your first expense!
+                  </p>
+                ) : (
+                  filteredExpenses.map((expense) => (
+                    <div
+                      key={expense.id}
+                      className="expense-item flex justify-between items-center p-4 border-2 border-gray-100 rounded-xl transition-all bg-gradient-to-r from-white to-gray-50 hover:from-indigo-50 hover:to-white"
+                    >
+                      <div>
+                        <h3 className="font-medium text-lg">{expense.title}</h3>
+                        <p className="text-gray-500 text-sm">
+                          {new Date(expense.date).toLocaleDateString()} •{' '}
+                          {categories.find(c => c.id === expense.category)?.name}
+                        </p>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-indigo-600">
+                          {parseFloat(expense.amount).toFixed(2)}
+                        </span>
+                        <button
+                          onClick={() => handleEdit(expense)}
+                          className="p-1 text-blue-500 hover:text-blue-700"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => handleDelete(expense.id)}
+                          className="p-1 text-red-500 hover:text-red-700"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl shadow-lg p-6 border-2 border-indigo-50 backdrop-blur-sm bg-opacity-70">
+                <h2 className="text-xl font-semibold mb-4">Summary</h2>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Total Expenses:</span>
+                    <span className="font-bold text-red-600">
+                      {totalExpenses.toFixed(2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Number of Expenses:</span>
+                    <span className="font-bold">
+                      {filteredExpenses.length}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <h2 className="text-xl font-semibold mb-4">Spending by Category</h2>
+                <div className="h-48 flex items-end space-x-2">
+                  {chartData.map((data) => (
+                    <div key={data.id} className="flex-1 flex flex-col items-center">
+                      <div
+                        className={`w-full ${data.color} rounded-t-sm chart-bar`}
+                        style={{
+                          height: Math.max(5, (data.total / Math.max(1, ...chartData.map(d => d.total))) * 100) + '%'
+                        }}
+                      />
+                      <span className="text-xs mt-1 text-center">{data.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<ExpenseTracker />);
+  </script>
+</body>
+</html>
